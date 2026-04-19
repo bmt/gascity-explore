@@ -1,0 +1,139 @@
+description = """
+Code review — claim a review bead, review the PR, post GitHub feedback.
+
+The reviewer claims an available review bead from the pool, reviews the PR
+diff, posts feedback on GitHub, records a summary, and exits. Stateless —
+reviews one PR per session.
+
+## Metadata Contract (on the review bead)
+
+| Field | Read | Write | Description |
+|-------|------|-------|-------------|
+| `pr_url` | R | | GitHub PR URL |
+| `pr_number` | R | | GitHub PR number |
+| `branch` | R | | Source branch |
+| `target` | R | | Target branch |
+| `review_summary` | | W | One-line: approved or changes-requested |
+| `blocking_issues` | | W | Count of blocking issues (0 if approved) |
+"""
+formula = "mol-reviewer"
+version = 2
+
+[vars]
+[vars.issue]
+description = "The review bead ID (created by steward, routed to reviewer pool)"
+required = true
+
+[[steps]]
+id = "claim"
+title = "Claim the review bead"
+description = """
+Pool agents must claim work atomically to prevent double-review.
+
+**1. Check for already-claimed work:**
+```bash
+bd list --assignee="$GC_SESSION_NAME" --status=in_progress
+```
+If you already have a bead in progress, resume it — skip to the review step.
+
+**2. Find available pool work:**
+```bash
+bd list --metadata-field "gc.routed_to=$GC_ALIAS" --status=open
+```
+
+**3. Claim it atomically:**
+```bash
+bd update <bead-id> --claim
+```
+The `--claim` flag sets assignee to your session name and status to
+in_progress in one atomic operation. If another pool member already
+claimed it, this fails — check for the next one.
+
+**4. If no work available:**
+```bash
+gc runtime drain-ack
+exit
+```
+
+**Exit criteria:** You own exactly one review bead (assignee = your session name, status = in_progress)."""
+
+[[steps]]
+id = "context"
+title = "Load project context"
+needs = ["claim"]
+description = """
+Understand the project standards and the scope of this work before reviewing.
+
+**1. Read project standards:**
+
+Review `AGENTS.md` and `docs/engineering-principles.md` in the repo root.
+
+**2. Check for an epic (parent bead):**
+```bash
+PARENT=$(bd show {{issue}} --json | jq -r '.[0].parent // empty')
+if [ -n "$PARENT" ]; then
+  bd show "$PARENT"
+fi
+```
+
+If there's a parent epic or referenced design docs, read them to understand
+the broader intent behind this PR.
+
+**Exit criteria:** You understand the project's engineering principles and the
+scope of the work being reviewed."""
+
+[[steps]]
+id = "review"
+title = "Review PR and post feedback"
+needs = ["context"]
+description = """
+Review the PR diff, post feedback on GitHub, record summary on bead.
+
+**1. Read bead metadata:**
+```bash
+bd show {{issue}} --json | jq '.metadata'
+```
+Extract pr_number, pr_url, branch, target.
+
+**2. Get the PR diff:**
+```bash
+gh pr diff <pr_number>
+gh pr view <pr_number> --json title,body,files
+```
+
+**3. Review the code.** Focus on:
+- Correctness (logic errors, nil dereferences, off-by-ones)
+- Test coverage for behavioral changes
+- Security (injection, secrets)
+- Breaking changes (API contracts, migrations)
+- Does it follow the engineering principles?
+
+Do NOT nitpick style, formatting, or minor naming preferences.
+
+**4. Post review on GitHub:**
+
+Post as a comment (do NOT use --approve or --request-changes — same GitHub account):
+```bash
+gh pr review <pr_number> --comment --body "<review summary with blocking issues and suggestions>"
+```
+
+**5. Record summary and close the review bead:**
+```bash
+bd update {{issue}} \
+  --set-metadata review_summary="<approved|changes-requested>" \
+  --set-metadata blocking_issues="<count>" \
+  --status=closed \
+  --notes "Review complete. <summary>"
+```
+
+Closing the review bead signals the steward that review is done. The
+steward reads review_summary and blocking_issues from this bead to
+decide routing.
+
+**6. Exit:**
+```bash
+gc runtime drain-ack
+exit
+```
+
+**Exit criteria:** Summary recorded on review bead, bead closed, session exiting."""

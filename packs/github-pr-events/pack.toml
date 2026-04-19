@@ -1,0 +1,39 @@
+[pack]
+name = "github-pr-events"
+version = "0.1.0"
+schema = 1
+description = "GitHub PR webhook bridge — translates PR events into beads"
+
+[[service]]
+name = "github-pr-webhook"
+kind = "proxy_process"
+state_root = ".gc/services/github-pr-events"
+
+[service.publication]
+visibility = "public"
+hostname = "github-pr"
+
+[service.process]
+command = ["python3", "-u", "scripts/pr_webhook_service.py"]
+health_path = "/healthz"
+
+[[doctor]]
+name = "python"
+description = "python3 3.11+ is available"
+script = "doctor/check-python.sh"
+
+[[doctor]]
+name = "gc"
+description = "gc CLI is available for bead creation"
+script = "doctor/check-gc.sh"
+
+[[commands]]
+name = "status"
+description = "Show PR webhook status and recent events"
+script = "commands/status.sh"
+
+[[commands]]
+name = "register"
+description = "Register webhook on a GitHub repo"
+long_description = "help/register.txt"
+script = "commands/register.sh"

@@ -1,0 +1,15 @@
+# pr-pipeline-health — detect stuck PRs in the review pipeline.
+#
+# Checks for beads with PR metadata that haven't moved through
+# steward → reviewer → human in a reasonable time. Escalates to mayor.
+#
+# Detected conditions:
+# - Bead assigned to steward for >10min (steward stuck or dead)
+# - Bead assigned to reviewer for >15min (reviewer stuck or pool didn't wake)
+# - Bead with gc.routed_to set but assignee doesn't match (routing mismatch)
+# - PR merged on GitHub but bead still open (missed close)
+[order]
+description = "Watch for stuck PRs in the review pipeline and escalate to mayor"
+gate = "cooldown"
+interval = "10m"
+exec = "$PACK_DIR/scripts/pr-pipeline-health.sh"

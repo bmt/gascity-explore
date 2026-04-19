@@ -1,0 +1,106 @@
+# Kit — PR-based review workflow pack.
+#
+# Extends gastown with a PR review lifecycle for repos without direct
+# push-to-main access. Replaces refinery (direct merge) with:
+#   steward   — PR lifecycle coordinator (on-demand)
+#   reviewer  — Codex-based code reviewer (on-demand pool)
+#
+# Sheriff (main branch health) is an exec order, not an agent.
+#
+# Polecat done-sequence is modified: run tests → push → create PR →
+# hand bead to steward.
+#
+# --- Upstream workarounds (file bugs against gascity/gastown) ---
+#
+# UPSTREAM-1: boot agent crash-loops when idle
+#   Boot cycles creating→drained every ~2min with no quarantine.
+#   Workaround: suspended in this pack (patches.agent below).
+#   Fix: boot should self-idle or controller should quarantine after N fast cycles.
+#
+# UPSTREAM-2: dolt-health order walks entire commit history
+#   `dolt log --oneline | wc -l` is O(n) and hammers CPU on large DBs.
+#   Workaround: interval override to 5m in city.toml.
+#   Fix: use `SELECT COUNT(*) FROM dolt_log` or cache the count.
+#
+# UPSTREAM-3: dolt sync reads non-existent remotes.json
+#   Upstream sync script looks for remotes.json; dolt stores remotes in
+#   repo_state.json. Silently skips all databases.
+#   Workaround: dolt-sync.sh override in this pack + order override in orders/.
+#   Fix: upstream sync should read repo_state.json.
+#
+# UPSTREAM-4: mol-dog-jsonl uses `dolt sql -P` (broken in dolt ≥1.86)
+#   The -P flag is not recognized; needs --port. Silently exports nothing.
+#   Workaround: jsonl-backup.sh override in orders/.
+#   Fix: upstream script should use --port/--host/--user flags.
+#
+# UPSTREAM-5: reaper does not purge closed order-tracking beads
+#   Order system creates issue-type tracking beads for cooldown gating.
+#   Reaper purges closed wisps and mail but never closed issues.
+#   ~1700 closed order tasks/day accumulate unbounded, bloating the DB.
+#   Workaround: order-purge.sh exec order in this pack.
+#   Fix: reaper should purge closed issues with title LIKE 'order:%' past retention.
+#
+# UPSTREAM-6: JSONL spike detection stuck-loop
+#   Spike halts export before committing, so baseline never updates.
+#   Next cycle re-detects the same "spike" and fires another escalation.
+#   Workaround: manual baseline commit when it happens.
+#   Fix: commit the export even on spike (just skip the push), or add a
+#   minimum-count floor so small DBs (N<50) don't trigger on normal growth.
+#
+# UPSTREAM-7: namepool not patchable per rig
+#   Neither AgentPatch nor AgentOverride exposes a namepool field.
+#   Can't define a kit-pack polecat either (duplicate agent error with gastown's).
+#   Pack-level patches apply pre-stamp so dir-targeted patches fail.
+#   Result: all rigs share the same namepool (gastown Mad Max names).
+#   Workaround: none — rig prefix disambiguates (spotlight/furiosa vs pbflags/furiosa).
+#   Fix: add `namepool` to AgentOverride so [[rigs.patches]] can override it.
+#
+# UPSTREAM-8: CSRF check blocks webhook POST on hosted services
+#   handler_services.go blocks all POSTs without X-GC-Request header
+#   on non-direct services, even from loopback. Breaks any external
+#   webhook (GitHub, Discord interactions). publish_mode=direct bypasses
+#   but packs can't set it.
+#   Workaround: none yet — gateway (websocket) still works for Discord DMs.
+#   Fix: exempt published services from CSRF, or allow loopback POSTs,
+#   or let packs set publish_mode=direct.
+#
+# UPSTREAM-9: bd ready excludes beads that block others
+#   bd ready filters out beads with any `blocks` dependency, but
+#   direction matters: a bead that blocks another is MORE urgent to
+#   work on (others are waiting). Only beads blocked BY something
+#   should be excluded. Breaks pool auto-spawning when review beads
+#   are created with `--deps "blocks:..."`.
+#   Workaround: don't use blocks deps on pool-claimed beads; use --parent instead.
+#   Fix: bd ready should only exclude beads where depends_on is open,
+#   not beads that appear as a blocker for others.
+#
+# -----------------------------------------------------------------
+
+[pack]
+name = "kit"
+schema = 2
+includes = ["//.gc/system/packs/gastown"]
+
+# Override mayor prompt with kit-specific version.
+[[patches.agent]]
+name = "mayor"
+prompt_template = "prompts/mayor.template.md"
+
+# Suspend refinery — replaced by steward in this pack.
+[[patches.agent]]
+name = "refinery"
+suspended = true
+
+# UPSTREAM-1: boot agent crash-loops when idle.
+[[patches.agent]]
+name = "boot"
+suspended = true
+
+# Polecat limits (max 2 per rig) set via [[rigs.patches]] in city.toml.
+# Pack-level patches can't target rig-stamped agents (applied pre-stamp).
+
+# Override polecat prompt for PR-based workflow.
+[[patches.agent]]
+name = "polecat"
+prompt_template = "prompts/polecat.template.md"
+

@@ -1,0 +1,14 @@
+Register a GitHub repository for PR event webhooks.
+
+Maps a repo (owner/repo) to a rig name so incoming PR events
+(reviews, merges, comments) create beads in the correct rig.
+
+Usage:
+  gc github-pr-events register <owner/repo> <rig-name>
+
+Examples:
+  gc github-pr-events register your-org/your-project my-app
+  gc github-pr-events register your-org/your-library my-lib
+
+After mapping, set the webhook secret and register the webhook
+on GitHub. The register command prints the exact gh API call.

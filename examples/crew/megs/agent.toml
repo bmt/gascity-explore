@@ -1,0 +1,10 @@
+# Megs — primary engineer, assigned to the main app rig.
+# Change "dir" to match your rig name.
+dir = "my-app"
+scope = "rig"
+work_dir = ".gc/worktrees/{{.Rig}}/crew/megs"
+pre_start = ["{{.ConfigDir}}/scripts/worktree-setup.sh {{.RigRoot}} {{.WorkDir}} megs --sync"]
+wake_mode = "fresh"
+idle_timeout = "2h"
+max_active_sessions = 1
+min_active_sessions = 0
