@@ -1,0 +1,8 @@
+scope = "rig"
+wake_mode = "fresh"
+work_dir = ".gc/worktrees/{{.Rig}}/reviewer"
+pre_start = ["{{.CityRoot}}/.gc/system/packs/gastown/scripts/worktree-setup.sh {{.RigRoot}} {{.WorkDir}} reviewer --sync"]
+nudge = "Review bead available — claim it and review the PR."
+idle_timeout = "15m"
+min_active_sessions = 0
+max_active_sessions = 2

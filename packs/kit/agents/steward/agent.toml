@@ -1,0 +1,8 @@
+scope = "rig"
+wake_mode = "fresh"
+work_dir = ".gc/worktrees/{{.Rig}}/steward"
+pre_start = ["{{.CityRoot}}/.gc/system/packs/gastown/scripts/worktree-setup.sh {{.RigRoot}} {{.WorkDir}} steward --sync"]
+nudge = "New bead assigned — scan for work and process."
+idle_timeout = "15m"
+max_active_sessions = 1
+min_active_sessions = 0

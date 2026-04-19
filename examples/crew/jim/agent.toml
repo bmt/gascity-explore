@@ -1,0 +1,10 @@
+# Jim — primary engineer, assigned to a secondary rig (e.g. a library).
+# Change "dir" to match your rig name.
+dir = "my-lib"
+scope = "rig"
+work_dir = ".gc/worktrees/{{.Rig}}/crew/jim"
+pre_start = ["{{.ConfigDir}}/scripts/worktree-setup.sh {{.RigRoot}} {{.WorkDir}} jim --sync"]
+wake_mode = "fresh"
+idle_timeout = "2h"
+max_active_sessions = 1
+min_active_sessions = 0

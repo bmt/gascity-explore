@@ -1,0 +1,73 @@
+# Example city.toml — Gas City workspace configuration.
+#
+# Copy this to city.toml and customize for your workspace.
+# Paths, rig names, and agent limits are all project-specific.
+
+[workspace]
+name = "kit"
+provider = "claude"
+includes = ["discord", "packs/kit", "packs/github-pr-events"]
+default_rig_includes = ["packs/kit"]
+
+[packs]
+[packs.discord]
+source = "https://github.com/gastownhall/gascity-packs"
+ref = "main"
+path = "discord"
+
+# Claude sessions — set max to 0 to disable auto-spawning.
+# Increase for interactive crew sessions.
+[[agent]]
+name = "claude"
+dir = "my-app"
+max_active_sessions = 0
+min_active_sessions = 0
+
+[[agent]]
+name = "claude"
+max_active_sessions = 0
+min_active_sessions = 0
+
+[[agent]]
+name = "reviewer"
+max_active_sessions = 0
+min_active_sessions = 0
+
+# --- Rigs ---
+# Each rig points to a project directory (usually a git checkout).
+# The kit pack is included by default; add project-specific packs too.
+
+[[rigs]]
+name = "my-app"
+path = "/path/to/your/project"
+includes = ["packs/kit"]
+
+[[rigs.patches]]
+agent = "polecat"
+max_active_sessions = 2
+
+[[rigs.patches]]
+agent = "reviewer"
+max_active_sessions = 3
+
+# Add more rigs as needed:
+# [[rigs]]
+# name = "my-lib"
+# path = "/path/to/your/library"
+# includes = ["packs/kit"]
+# suspended = true  # start suspended, resume when ready
+
+[session]
+# To work around slow session spawning (unrelated to this pack)
+startup_timeout = "600s"
+
+[orders]
+
+# Reduce dolt-health frequency to avoid CPU spikes (UPSTREAM-2).
+[[orders.overrides]]
+name = "dolt-health"
+interval = "5m"
+
+[[orders.overrides]]
+name = "beads-health"
+interval = "5m"

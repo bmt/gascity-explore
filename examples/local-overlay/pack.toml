@@ -1,0 +1,11 @@
+# Local overlay pack — overrides identity fragments from the kit pack.
+#
+# This pack contains only your personal customizations. Everything else
+# comes from the kit pack (sourced remotely or locally).
+#
+# In city.toml, include this AFTER the kit pack so your fragments win:
+#   includes = ["packs/kit", "packs/local"]
+
+[pack]
+name = "local"
+schema = 2

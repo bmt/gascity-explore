@@ -1,0 +1,5 @@
+[order]
+description = "Purge stale closed order-tracking beads past 48h retention"
+exec = "$PACK_DIR/scripts/order-purge.sh"
+gate = "cooldown"
+interval = "1h"

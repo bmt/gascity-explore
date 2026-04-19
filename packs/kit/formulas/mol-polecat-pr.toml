@@ -1,0 +1,122 @@
+description = """
+Polecat work lifecycle — PR-based variant.
+
+Extends mol-polecat-work with PR creation instead of refinery submission.
+The polecat implements the work, runs tests as a quality gate, pushes
+the branch, creates a PR, and assigns the work bead to the steward.
+
+## Metadata Contract
+
+| Field | Set by | When | Description |
+|-------|--------|------|-------------|
+| `worktree` | polecat (workspace-setup) | Early | Absolute path to git worktree |
+| `branch` | polecat (workspace-setup) | Early | Source branch name |
+| `target` | polecat (submit) | Late | Target branch (default branch) |
+| `pr_url` | polecat (submit) | Late | GitHub PR URL |
+| `pr_number` | polecat (submit) | Late | GitHub PR number |
+| `rejection_reason` | steward/human (on feedback) | On reject | Why work needs changes |
+
+## Failure Modes
+
+| Situation | Action |
+|-----------|--------|
+| Tests fail before push | Fix them. Loop until passing. Do not push with failures. |
+| PR creation fails | Check auth (bot account), check branch is pushed, retry. Escalate if stuck. |
+| Blocked on external | Mail Witness, mark yourself stuck |
+| Context filling | `gc runtime request-restart` |"""
+formula = "mol-polecat-pr"
+extends = ["mol-polecat-work"]
+version = 1
+
+[[steps]]
+id = "submit-and-exit"
+title = "Run tests, create PR, and exit"
+needs = ["self-review"]
+description = """
+Quality gate, PR creation, and self-clean. You cease to exist after this step.
+
+**1. Run tests (quality gate):**
+```bash
+# Run the project's test suite. This MUST pass before pushing.
+# Check the repo for test commands — typically:
+#   make test, npm test, go test ./..., pytest, etc.
+# If tests fail: fix the issue, commit the fix, re-run. Loop until green.
+# If you find existing failures unrelated to your change, file beads for the
+# breakages and work around them to test your changes.
+```
+
+Do NOT proceed to push until tests pass. This is a hard gate.
+
+**2. Final clean-state verification:**
+```bash
+git status --porcelain
+```
+If ANY output (untracked files, uncommitted changes):
+```bash
+git add -A && git commit -m "chore: capture remaining work ({{issue}})"
+```
+
+**3. Push your branch:**
+```bash
+git push origin HEAD
+```
+
+**4. Create a pull request:**
+```bash
+BRANCH=$(git branch --show-current)
+PR_URL=$(gh pr create \
+  --title "<concise title from the bead>" \
+  --body "Resolves {{issue}}
+
+## Summary
+<2-3 bullet points describing what changed and why>
+
+## Test plan
+<how to verify this works>" \
+  --base {{base_branch}} \
+  --head "$BRANCH" \
+  2>&1)
+
+echo "$PR_URL"
+```
+
+If the PR already exists (e.g., resuming after rejection):
+```bash
+PR_URL=$(gh pr view --json url -q '.url' 2>/dev/null)
+```
+
+Extract the PR number:
+```bash
+PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+```
+
+**5. Update metadata and assign to steward:**
+```bash
+bd update {{issue}} \
+  --set-metadata target={{base_branch}} \
+  --set-metadata pr_url="$PR_URL" \
+  --set-metadata pr_number="$PR_NUMBER" \
+  --set-metadata branch=$(git branch --show-current) \
+  --unset-metadata gc.routed_to \
+  --assignee=<rig>/steward \
+  --notes "PR created: $PR_URL"
+```
+
+**6. Nudge steward:**
+```bash
+gc nudge <rig>/steward "PR assigned: {{issue}}"
+```
+
+**7. Burn the formula wisp:**
+```bash
+bd mol burn <wisp-id> --force
+```
+
+**8. Signal reconciler and exit.**
+```bash
+gc runtime drain-ack
+exit
+```
+
+**Exit criteria:** Tests green, branch pushed, PR created, metadata set, work
+bead assigned to steward, steward nudged, wisp burned, session exited."""
